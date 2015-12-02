@@ -22,8 +22,9 @@
 
 (def client (connection cqp-spec))
 (def result (.query client "EUROPARL-DE" "'de'"  "s"))
-(def result (.queryDump client "NL" "'.*éens' [word='.*']+"  "s" "utf8"))
+(def result (.queryDump client "NL" "'.*éens' [word='.*']+ within s"  "s" "utf8"))
 (.corpusCharset client "GER")
+(vec (.listCorpora client))
 (def cpos (first (map vec (.dumpRange result 0 10))))
 (map vec (map #(.dumpPositionalAttributes client "NL" "word" % (+ 5 %) "utf8") cpos))
 (.size result)

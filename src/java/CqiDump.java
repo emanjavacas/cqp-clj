@@ -46,7 +46,7 @@ public class CqiDump {
 	end = (end >= resultSize) ? resultSize : end;
 	int resultIndex = 0;
 	int dumpSize = end - start;
-	int[][] result = new int[5][dumpSize];
+	int[][] result = new int[3][dumpSize];
 	while (start < end) {
 	    // read to buffer
 	    int bufferEnd = (start + BUFFER_SIZE > end) ? end - 1 : start + BUFFER_SIZE - 1;
@@ -54,15 +54,11 @@ public class CqiDump {
 	    client.dumpSubCorpus(subCorpusName, CqiClient.CQI_CONST_FIELD_MATCH, start, bufferEnd, resultsBuffer[MATCH_START]);
             client.dumpSubCorpus(subCorpusName, CqiClient.CQI_CONST_FIELD_MATCHEND, start, bufferEnd, resultsBuffer[MATCH_END]);
             client.dumpSubCorpus(subCorpusName, CqiClient.CQI_CONST_FIELD_TARGET, start, bufferEnd, resultsBuffer[TARGET]);
-            client.cpos2LBound(contextStructuralAttributeName, resultsBuffer[MATCH_START], resultsBuffer[CONTEXT_START], bufferSize);
-            client.cpos2RBound(contextStructuralAttributeName, resultsBuffer[MATCH_END], resultsBuffer[CONTEXT_END], bufferSize);
 	    // assign to result
 	    for (int i = 0; i < bufferSize; i++) {
 		result[MATCH_START][resultIndex + i] = resultsBuffer[MATCH_START][i];	
 		result[MATCH_END][resultIndex + i] = resultsBuffer[MATCH_END][i];
 		result[TARGET][resultIndex + i] = resultsBuffer[TARGET][i];
-		result[CONTEXT_START][resultIndex + i] = resultsBuffer[CONTEXT_START][i];
-		result[CONTEXT_END][resultIndex + i] = resultsBuffer[CONTEXT_END][i];
 	    }
 	    resultIndex += bufferSize;
 	    start += bufferSize;

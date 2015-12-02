@@ -193,22 +193,30 @@ public class CqiClient {
     }
 
     /**
-     * Check whether a structural attribute has values
-     *
-     * @param attribute the attribute
-     * @return true, if it has values
-     * @throws CqiClientException
+     * Gives positional attribute for a range of positions
+     * 
      */
-    @Deprecated
-    public synchronized boolean corpusStructuralAttributeHasValues(
-            String attribute) throws CqiClientException {
-        try {
-            this.streamToServer.write(CQI_CORPUS_STRUCTURAL_ATTRIBUTE_HAS_VALUES);
-            this.writeString(attribute);
-            return readBoolean();
-        } catch (IOException e) {
-            throw new CqiClientException(SERVER_IO_ERROR, e);
-        }
+
+    public synchronized String[] dumpPositionalAttributes(String corpus, String attribute, int fromPosition, 
+            int toPosition) throws CqiClientException {
+	String strCharset;
+	try {
+	    strCharset = corpusCharset(corpus);
+	} catch (IOException e) {
+	    throw new CqiClientException(SERVER_IO_ERROR, e);
+	}
+	return dumpPositionalAttributes(corpus, attribute, fromPosition, toPosition, strCharset);
+    }
+
+    public synchronized String[] dumpPositionalAttributes(String corpus, String attribute, int fromPosition, 
+            int toPosition, String strCharset) throws CqiClientException {
+	Charset charset = Charset.forName(strCharset);
+	return dumpPositionalAttributes(corpus, attribute, fromPosition, toPosition, charset);
+    }
+
+    public synchronized String[] dumpPositionalAttributes(String corpus, String attribute, int fromPosition, 
+            int toPosition, Charset charset) throws CqiClientException {
+	return cpos2Str(String.format("%s.%s", corpus, attribute), fromPosition, toPosition, charset);
     }
 
     /**
@@ -687,10 +695,6 @@ public class CqiClient {
         return genericStringToString(corpus, CQI_CORPUS_FULL_NAME);
     }
 
-    // public synchronized String[] getValues(String corpusName, String positionalAttribute, int from, int to, Charset charset) throws CqiClientException {
-    // 	return cpos2String.
-    // }
-
     /**
      * Converts positions to their value given an attribute.
      *
@@ -783,7 +787,6 @@ public class CqiClient {
         } catch (IOException e) {
             throw new CqiClientException(SERVER_IO_ERROR, e);
         }
-
     }
 
     /**
@@ -819,18 +822,25 @@ public class CqiClient {
      * @param corpus the corpus
      * @param query the query
      * @param contextStructuralAttribute context structural attribute
-     * @param metadataStructuralAttributes metadata structural attributes
      * @throws CqiClientException
      */
+    public synchronized CqiDump queryDump(String corpus, String query, String contextStructuralAttribute, String strCharset) throws CqiClientException {
+	String queryName = String.format("Q%d", System.currentTimeMillis());
+	String subCorpus = String.format("%s:%s", corpus, queryName);
+	Charset charset = Charset.forName(strCharset);
+	cqpQuery(corpus, queryName, query, charset);
+	return new CqiDump(this, corpus, subCorpus, charset, subCorpusSize(subCorpus), contextStructuralAttribute);
+    }
+
     public synchronized CqiDump queryDump(String corpus, String query, String contextStructuralAttribute) throws CqiClientException {
 	String queryName = String.format("Q%d", System.currentTimeMillis());
 	String subCorpus = String.format("%s:%s", corpus, queryName);
 	Charset charset;
-	try {
-	    charset = Charset.forName(corpusCharset(corpus));
-	} catch (IOException e) {
-	    throw new CqiClientException(SERVER_IO_ERROR, e);
-	}
+        try {
+            charset = Charset.forName(corpusCharset(corpus));
+        } catch (IOException e) {
+            throw new CqiClientException(SERVER_IO_ERROR, e);
+        }
 	cqpQuery(corpus, queryName, query, charset);
 	return new CqiDump(this, corpus, subCorpus, charset, subCorpusSize(subCorpus), contextStructuralAttribute);
     }

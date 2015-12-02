@@ -21,8 +21,11 @@
     (CQiPaginator. result index)))
 
 (def client (connection cqp-spec))
-(def result (.queryDump client "DICKENS" "'the'"  "s"))
-(map vec (.dumpRange result 0 10))
+(def result (.query client "EUROPARL-DE" "'de'"  "s"))
+(def result (.queryDump client "NL" "'.*éens' [word='.*']+"  "s" "utf8"))
+(.corpusCharset client "GER")
+(def cpos (first (map vec (.dumpRange result 0 10))))
+(map vec (map #(.dumpPositionalAttributes client "NL" "word" % (+ 5 %) "utf8") cpos))
 (.size result)
 (.next result)
 (.getIndex result)
@@ -33,7 +36,8 @@
 (def iterator (partition 2 (map vec (iterator-seq (.iterator result)))))
 (vec (.getValues result "word" start end))
 (.getStructuralAttributeValue result 0)
-(def matchstarts (first (map vec (.cposRange result 10000 10002))))
+(def matchstarts (first (map vec (.cposRange result 0 8))))
+(map vec (map #(.getValues result "word" % (+ % 2)) (first (map vec (.cposRange result 20 28)))))
 
 (.getMatchStart result)
 (.next result)

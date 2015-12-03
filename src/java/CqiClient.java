@@ -19,6 +19,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
 import java.nio.charset.Charset;
+import java.util.Arrays;
 
 
 public class CqiClient {
@@ -89,13 +90,18 @@ public class CqiClient {
     private static final String GENERAL_ERROR = "General error";
     private static final String INSUFFICIENT_BUFFER_SIZE = "Insufficient buffer size";
     private static final String SERVER_IO_ERROR = "IO Error while communicating to the server";
+    /**
+     * Constants
+     */
+    private static final String DEFAULT_SUBCORPUS_NAME = "Results";
     private static final int BYTE_BUFFER_SIZE = 40;
-    private static final int BUFFER_SIZE = 10;    
+    private static final int BUFFER_SIZE = 10;
     private Socket socket;
     private SocketAddress serverAddress;
     private DataOutput streamToServer;
     private DataInput streamFromServer;
-    private final byte[] buffer = new byte[BYTE_BUFFER_SIZE];
+    private final int[][] buffer = new int[3][BUFFER_SIZE];
+    private final byte[] byteBuffer = new byte[BYTE_BUFFER_SIZE];
 
     /**
      * Instantiates a new cqi client.
@@ -177,6 +183,7 @@ public class CqiClient {
     public synchronized String[] listSubcorpora(String corpus) throws CqiClientException {
 	try {
 	    this.streamToServer.write(CQI_CQP_LIST_SUBCORPORA);
+	    this.writeString(corpus);
 	    return readStringArray(DEFAULT_CHARSET);
 	} catch (IOException e) {
 	    throw new CqiClientException(SERVER_IO_ERROR, e);
@@ -338,36 +345,120 @@ public class CqiClient {
 	return struc2Str(attributeName, strucs, charset);
     }
 
-   
     /**
-     * Runs a CQP query using a more CQP-like API. Uses the CqiDump class.
-     *
-     * @param corpus the corpus
+     * Runs a default CQP query (storing results to result)
+     * @param corpus the corpus name
      * @param query the query
-     * @param contextStructuralAttribute context structural attribute
-     * @throws CqiClientException
-     */
-    // public synchronized CqiDump query(String corpus, String query) throws CqiClientException {
-    // 	String queryName = String.format("Q%d", System.currentTimeMillis());
-    // 	String subCorpus = String.format("%s:%s", corpus, queryName);
-    // 	Charset charset;
-    //     try {
-    //         charset = Charset.forName(corpusCharset(corpus));
-    //     } catch (IOException e) {
-    //         throw new CqiClientException(SERVER_IO_ERROR, e);
-    //     }
-    // 	cqpQuery(corpus, queryName, query, charset);
-    // 	return new CqiDump(this, corpus, subCorpus, charset, subCorpusSize(subCorpus));
-    // }
+     */ 
 
-    // public synchronized CqiDump query(String corpus, String query, 
-    // 	     String strCharset) throws CqiClientException {
-    // 	String queryName = String.format("Q%d", System.currentTimeMillis());
-    // 	String subCorpus = String.format("%s:%s", corpus, queryName);
-    // 	Charset charset = Charset.forName(strCharset);
-    // 	cqpQuery(corpus, queryName, query, charset);
-    // 	return new CqiDump(this, corpus, subCorpus, charset, subCorpusSize(subCorpus));
-    // }
+    public synchronized boolean query(String corpus, String query) {
+	try {
+	    cqpQuery(corpus, DEFAULT_SUBCORPUS_NAME, query, DEFAULT_CHARSET);
+	    return true;
+	} catch (CqiClientException e) {
+	    return false;
+	}
+    }
+
+    public synchronized boolean query(String corpus, String query, String charset) {
+	Charset charsetCharset = Charset.forName(charset);
+	return query(corpus, query, charsetCharset);
+    }
+
+    public synchronized boolean query(String corpus, String query, Charset charset) {
+	try {
+	    cqpQuery(corpus, DEFAULT_SUBCORPUS_NAME, query, charset);
+	    return true;
+	} catch (CqiClientException e) {
+	    return false;
+	}
+    }
+
+    public synchronized boolean query(String corpus, String subcorpus, String query, Charset charset) {
+	try {
+	    cqpQuery(corpus, subcorpus, query, charset);
+	    return true;
+	} catch (CqiClientException e) {
+	    return false;
+	}
+    }
+    /**
+     * drops query, defaulting to default subcorpus name
+     *
+     * @param corpus corpus name
+     * @param subcorpus
+     */
+    public synchronized boolean dropQuery(String corpus, String subCorpus){
+	try {
+	    dropSubCorpus(String.format("%s:%s", corpus, subCorpus));
+	} catch (CqiClientException e) {
+	    return false;
+	}
+	return true;
+    }
+
+    public synchronized boolean dropQuery(String corpus){
+	return dropQuery(corpus, DEFAULT_SUBCORPUS_NAME);
+    }
+    /**
+     * returns query size with appropriate defaults
+     *
+     * @param corpus corpus name
+     */
+    public int querySize(String corpus, String subcorpus){
+	try {
+	    return subCorpusSize(String.format("%s:%s", corpus, subcorpus));
+	} catch (CqiClientException e) {
+	    return -1;
+	}
+    }
+
+    public int querySize(String corpus) {
+	return querySize(corpus, DEFAULT_SUBCORPUS_NAME);
+    }
+
+    /**
+     * non-buffered dumpSubcorpus. Defaults to default subcorpus name
+     *
+     * @param corpus corpus name
+     * @param fromPosition first index in subcorpus to be dumped
+     * @param fromPosition last index in subcorpus to be dumped  
+     */
+    public synchronized int[][] dumpSubCorpus(String corpus, String subCorpus, int fromPosition, int toPosition) {
+	try {
+	    String[] subcorpora = listSubcorpora(corpus);
+	    if (!Arrays.asList(listSubcorpora(corpus)).contains(subCorpus)) {
+		return new int[3][0];
+	    } 	    
+	    String subCorpusName = String.format("%s:%s", corpus, subCorpus);
+	    int resultSize = subCorpusSize(subCorpusName);
+	    toPosition = (toPosition >= resultSize) ? resultSize : toPosition;
+	    int index = 0;
+	    int dumpSize = toPosition - fromPosition;
+	    int[][] result = new int[3][dumpSize];
+	    while (fromPosition < toPosition) {
+		int bufferEnd = (fromPosition + BUFFER_SIZE > toPosition) ? toPosition - 1 : fromPosition + BUFFER_SIZE - 1;
+		int bufferSize = bufferEnd - fromPosition + 1;
+		dumpSubCorpusBuffer(subCorpusName, CqiClient.CQI_CONST_FIELD_MATCH, fromPosition, bufferEnd, buffer[0]);
+		dumpSubCorpusBuffer(subCorpusName, CqiClient.CQI_CONST_FIELD_MATCHEND, fromPosition, bufferEnd, buffer[1]);
+		dumpSubCorpusBuffer(subCorpusName, CqiClient.CQI_CONST_FIELD_TARGET, fromPosition, bufferEnd, buffer[2]);
+		for (int i = 0; i < bufferSize; i++) {
+		    result[0][index + i] = buffer[0][i];
+		    result[1][index + i] = buffer[1][i];
+		    result[2][index + i] = buffer[2][i];		
+		}
+		index += bufferSize;
+		fromPosition += bufferSize;
+	    }
+	    return result;
+	} catch (CqiClientException e) {
+	    return new int[3][0];		
+	}
+    }
+
+    public synchronized int[][] dumpSubCorpus(String corpus, int fromPosition, int toPosition) {
+	return dumpSubCorpus(corpus, DEFAULT_SUBCORPUS_NAME, fromPosition, toPosition);
+    }
 
     /**
      * Write a string on the socket.
@@ -553,12 +644,12 @@ public class CqiClient {
             throw new CqiClientException(INSUFFICIENT_BUFFER_SIZE);
         }
         int bsize = arrayLength * 4;
-        if (buffer.length < bsize) {
+        if (byteBuffer.length < bsize) {
             throw new CqiClientException(INSUFFICIENT_BUFFER_SIZE);
         }
-        streamFromServer.readFully(buffer, 0, bsize);
+        streamFromServer.readFully(byteBuffer, 0, bsize);
         for (int i = 0; i + 3 < bsize; i += 4) {
-            output[i >> 2] = bytesToInt(buffer[i], buffer[i + 1], buffer[i + 2], buffer[i + 3]);
+            output[i >> 2] = bytesToInt(byteBuffer[i], byteBuffer[i + 1], byteBuffer[i + 2], byteBuffer[i + 3]);
         }
     }
 
@@ -1012,7 +1103,7 @@ public class CqiClient {
      *
      * @throws CqiClientException
      */
-    synchronized void dumpSubCorpus(String subcorpus, byte field,
+    synchronized void dumpSubCorpusBuffer(String subcorpus, byte field,
             int first, int last, int[] output) throws CqiClientException {
         try {
             this.streamToServer.write(CQI_CQP_DUMP_SUBCORPUS);

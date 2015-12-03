@@ -2,45 +2,12 @@
   (:import [CqiClient]  [CqiResult] [CqiDump])
   (:require [cqp-clj.spec :refer [cqp-spec]]))
 
-(defn- connection [spec]
-  (let [client (CqiClient. (:host cqp-spec) (:port cqp-spec))]
-    (doto client (.connect (:user cqp-spec) (:pass cqp-spec)))))
-
-(def client (connection cqp-spec))
-(def result (.cqpQuery client "DICKENS" "'the'"))
-(def cpos (first (map vec (.dumpRange result 0 22221))))
-(map identity cpos)
-(vec (.dumpPositionalAttributes client "DICKENS" "word" (into-array Integer/TYPE cpos)))
-(vec (.dumpStructuralAttributes client "DICKENS" "s" (into-array Integer/TYPE cpos)))
-(.listSubcorpora client "DICKENS")
-
-(.size result)
-(.next result)
-(.getIndex result)
-(.getTarget result) 
-(.getContextEnd result)
-(def start (.getMatchStart result))
-(def end (.getMatchEnd result))
-(def iterator (partition 2 (map vec (iterator-seq (.iterator result)))))
-(vec (.getValues result "word" start end))
-(.getStructuralAttributeValue result 0)
-(def matchstarts (first (map vec (.cposRange result 0 8))))
-(map vec (map #(.getValues result "word" % (+ % 2)) (first (map vec (.cposRange result 20 28)))))
-
-(.getMatchStart result)
-(.next result)
-
-(.getValues result )
-(vec (.corpusPositionalAttributes client "DICKENS"))
-
-(defrecord CQiClient [conn query])
+(defrecord CQiClient [conn])
 
 (defn make-cqi-client [{host :host port :port user :user pass :pass}]
   (let [conn (doto (CqiClient. host port)
                (.connect user pass))]
     (map->CQiClient {:conn conn})))
-
-(def client (make-cqi-client cqp-spec))
 
 ;;; utility functions
 (defn pager-next
@@ -81,33 +48,40 @@
     [n (dosync (ref-set current (+ n page-size)))]))
 
 ;;; public API
-(defn disconnect [client]
+(defn disconnect! [client]
   (let [conn (:conn client)]
-    (.disconnect client)))
+    (.disconnect conn)))
 
-(defn set-query! 
-  ([client corpus query attr charset]
-   (let [{conn :conn query :query} client]
-     (when query (.clear query))
-     (assoc client :query (.query conn corpus query attr charset))))
-  ([client corpus query attr]
-   (set-query! client corpus query attr "utf8"))
+(defn query! 
+  ([client corpus query charset]
+   (let [{conn :conn} client]
+     (.query conn corpus query charset)))
   ([client corpus query]
-   (set-query! client corpus query "s")))
+   (query! client corpus query "utf8")))
 
-(defn query-size ^Integer [client]
-  (let [{conn :conn query :query} client]
-    (.subCorpusSize client query)))
+(defn query-size ^Integer [client corpus]
+  (let [{conn :conn} client]
+    (.querySize conn corpus)))
 
-(defn dump-query [client from to & fields]
-  (let [{conn :conn query :query} client]
-    (if (not query)
-      nil
-      (let [[start end target] (map vec (.dumpRange query from to))]
-        
-        ;; todo: [[start end target] [start end target]] -> [{:}]
-        ))))
+(defn dump-query [client corpus from to & fields]
+  (let [{conn :conn} client
+        [start end target] (map vec (.dumpSubCorpus conn corpus from to))]
+    (map vec (map #(.dumpPositionalAttributes conn corpus "word" % %2) start end))))
 
+
+(def client (make-cqi-client cqp-spec))
+
+(query! client "EUROPARL-DE" "'.*' 'de'" "utf8")
+(query-size client "EUROPARL-DE")
+(dump-query client "EUROPARL-DE" 0 50)
+(disconnect! client)
 
 (def pager (Paginator. (range 10) (ref 0)))
 (nth-page pager 14 1)
+
+;;; input:  [from to & context target?]
+;;; output (vector length (to - from) + 2 * context:
+;;;;;; [{:cpos Int :token String :fieldX String :match bool :target bool} {} ...}]
+
+;;; todo:
+;;; include corpus in cqiClient?

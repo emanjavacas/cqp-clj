@@ -29,17 +29,14 @@ public class CqiDump {
     private final String subCorpusName;
     private final Charset charset;
     private final int resultSize;
-    private final String contextStructuralAttributeName;
-    private int bufferStart;
-    
+    private int bufferStart;    
 
-    CqiDump(CqiClient client, String corpusName, String subCorpusName, Charset charset, int resultSize, String contextStructuralAttribute) {
+    CqiDump(CqiClient client, String corpusName, String subCorpusName, Charset charset, int resultSize) {
 	this.client = client;
 	this.corpusName = corpusName;
         this.subCorpusName = subCorpusName;
         this.resultSize = resultSize;
         this.charset = charset;
-        this.contextStructuralAttributeName = String.format("%s.%s", corpusName, contextStructuralAttribute);
     }
 
     public int[][] dumpRange(int start, int end) throws CqiClientException {
@@ -64,5 +61,12 @@ public class CqiDump {
 	    start += bufferSize;
 	}
 	return result;
+    }
+    public void clear() throws CqiClientException {
+	client.dropSubCorpus(subCorpusName);
+    }
+
+    public int size() {
+	return resultSize;
     }
 }

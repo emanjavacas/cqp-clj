@@ -89,12 +89,13 @@ public class CqiClient {
     private static final String GENERAL_ERROR = "General error";
     private static final String INSUFFICIENT_BUFFER_SIZE = "Insufficient buffer size";
     private static final String SERVER_IO_ERROR = "IO Error while communicating to the server";
-    private static final int BUFFER_SIZE = 40;
+    private static final int BYTE_BUFFER_SIZE = 40;
+    private static final int BUFFER_SIZE = 10;    
     private Socket socket;
     private SocketAddress serverAddress;
     private DataOutput streamToServer;
     private DataInput streamFromServer;
-    private final byte[] buffer = new byte[BUFFER_SIZE];
+    private final byte[] buffer = new byte[BYTE_BUFFER_SIZE];
 
     /**
      * Instantiates a new cqi client.
@@ -245,27 +246,48 @@ public class CqiClient {
      * @param charset charset object specifying the charset
      * @param strCharset string specifying the charset
      */
+    public synchronized String[] dumpPositionalAttributes(String corpus, String attribute, int[] cpos,
+	Charset charset) throws CqiClientException {
+	return cpos2Str(String.format("%s.%s", corpus, attribute), cpos, charset);
+    }
+
+    public synchronized String[] dumpPositionalAttributes(String corpus, String attribute, int[] cpos)
+	throws CqiClientException {
+	Charset charset;
+	try {
+	    charset = Charset.forName(corpusCharset(corpus));
+	} catch (IOException e) {
+	    throw new CqiClientException(SERVER_IO_ERROR, e);
+	} 
+	return dumpPositionalAttributes(corpus, attribute, cpos, charset);
+    }
+
+    public synchronized String[] dumpPositionalAttributes(String corpus, String attribute, 
+             int fromPosition, int toPosition, Charset charset) throws CqiClientException {
+	return cpos2Str(String.format("%s.%s", corpus, attribute), fromPosition, toPosition, charset);
+    }
 
     public synchronized String[] dumpPositionalAttributes(String corpus, String attribute, 
              int fromPosition, int toPosition) throws CqiClientException {
-	String strCharset;
+	Charset charset;
 	try {
-	    strCharset = corpusCharset(corpus);
+	    charset = Charset.forName(corpusCharset(corpus));
 	} catch (IOException e) {
 	    throw new CqiClientException(SERVER_IO_ERROR, e);
 	}
-	return dumpPositionalAttributes(corpus, attribute, fromPosition, toPosition, strCharset);
+	return dumpPositionalAttributes(corpus, attribute, fromPosition, toPosition, charset);
+    }
+
+    public synchronized String[] dumpPositionalAttributes(String corpus, String attribute, 
+             int[] cpos, String strCharset) throws CqiClientException {
+	Charset charset = Charset.forName(strCharset);
+	return dumpPositionalAttributes(corpus, attribute, cpos, charset);
     }
 
     public synchronized String[] dumpPositionalAttributes(String corpus, String attribute, 
              int fromPosition, int toPosition, String strCharset) throws CqiClientException {
 	Charset charset = Charset.forName(strCharset);
 	return dumpPositionalAttributes(corpus, attribute, fromPosition, toPosition, charset);
-    }
-
-    public synchronized String[] dumpPositionalAttributes(String corpus, String attribute, 
-             int fromPosition, int toPosition, Charset charset) throws CqiClientException {
-	return cpos2Str(String.format("%s.%s", corpus, attribute), fromPosition, toPosition, charset);
     }
 
     /**
@@ -278,28 +300,45 @@ public class CqiClient {
      * @param strCharset string specifying the charset
      */
 
-    public synchronized String[] dumpStructuralAttributes(String corpus, String attribute, 
-             int fromPosition, int toPosition) throws CqiClientException {
-	String strCharset;
+    public synchronized String[] dumpStructuralAttributes(String corpus, String attribute, int[] cpos, Charset charset) throws CqiClientException {
+	String attributeName = String.format("%s.%s", corpus, attribute);
+	int[] strucs = cpos2Struc(attributeName, cpos);
+	return struc2Str(attributeName, strucs, charset);
+    }
+
+    public synchronized String[] dumpStructuralAttributes(String corpus, String attribute, int[] cpos) throws CqiClientException {
+	Charset charset;
 	try {
-	    strCharset = corpusCharset(corpus);
+	    charset = Charset.forName(corpusCharset(corpus));
 	} catch (IOException e) {
 	    throw new CqiClientException(SERVER_IO_ERROR, e);
 	}
-	return dumpStructuralAttributes(corpus, attribute, fromPosition, toPosition, strCharset);
+	String attributeName = String.format("%s.%s", corpus, attribute);
+	int[] strucs = cpos2Struc(attributeName, cpos);
+	return struc2Str(attributeName, strucs, charset);
     }
 
     public synchronized String[] dumpStructuralAttributes(String corpus, String attribute, 
-             int fromPosition, int toPosition, String strCharset) throws CqiClientException {
-	Charset charset = Charset.forName(strCharset);
-	return dumpStructuralAttributes(corpus, attribute, fromPosition, toPosition, charset);
+           int fromPosition, int toPosition, Charset charset) throws CqiClientException {
+	String attributeName = String.format("%s.%s", corpus, attribute);
+	int[] strucs = cpos2Struc(attributeName, fromPosition, toPosition);
+	return struc2Str(attributeName, strucs, charset);
     }
 
     public synchronized String[] dumpStructuralAttributes(String corpus, String attribute, 
-             int fromPosition, int toPosition, Charset charset) throws CqiClientException {
-	return cpos2Str(String.format("%s.%s", corpus, attribute), fromPosition, toPosition, charset);
+           int fromPosition, int toPosition) throws CqiClientException {
+	Charset charset;
+	try {
+	    charset = Charset.forName(corpusCharset(corpus));
+	} catch (IOException e) {
+	    throw new CqiClientException(SERVER_IO_ERROR, e);
+	}
+	String attributeName = String.format("%s.%s", corpus, attribute);
+	int[] strucs = cpos2Struc(attributeName, fromPosition, toPosition);
+	return struc2Str(attributeName, strucs, charset);
     }
 
+   
     /**
      * Runs a CQP query using a more CQP-like API. Uses the CqiDump class.
      *
@@ -308,27 +347,27 @@ public class CqiClient {
      * @param contextStructuralAttribute context structural attribute
      * @throws CqiClientException
      */
-    public synchronized CqiDump query(String corpus, String query, String contextStructuralAttribute, 
-	     String strCharset) throws CqiClientException {
-	String queryName = String.format("Q%d", System.currentTimeMillis());
-	String subCorpus = String.format("%s:%s", corpus, queryName);
-	Charset charset = Charset.forName(strCharset);
-	cqpQuery(corpus, queryName, query, charset);
-	return new CqiDump(this, corpus, subCorpus, charset, subCorpusSize(subCorpus), contextStructuralAttribute);
-    }
+    // public synchronized CqiDump query(String corpus, String query) throws CqiClientException {
+    // 	String queryName = String.format("Q%d", System.currentTimeMillis());
+    // 	String subCorpus = String.format("%s:%s", corpus, queryName);
+    // 	Charset charset;
+    //     try {
+    //         charset = Charset.forName(corpusCharset(corpus));
+    //     } catch (IOException e) {
+    //         throw new CqiClientException(SERVER_IO_ERROR, e);
+    //     }
+    // 	cqpQuery(corpus, queryName, query, charset);
+    // 	return new CqiDump(this, corpus, subCorpus, charset, subCorpusSize(subCorpus));
+    // }
 
-    public synchronized CqiDump query(String corpus, String query, String contextStructuralAttribute) throws CqiClientException {
-	String queryName = String.format("Q%d", System.currentTimeMillis());
-	String subCorpus = String.format("%s:%s", corpus, queryName);
-	Charset charset;
-        try {
-            charset = Charset.forName(corpusCharset(corpus));
-        } catch (IOException e) {
-            throw new CqiClientException(SERVER_IO_ERROR, e);
-        }
-	cqpQuery(corpus, queryName, query, charset);
-	return new CqiDump(this, corpus, subCorpus, charset, subCorpusSize(subCorpus), contextStructuralAttribute);
-    }
+    // public synchronized CqiDump query(String corpus, String query, 
+    // 	     String strCharset) throws CqiClientException {
+    // 	String queryName = String.format("Q%d", System.currentTimeMillis());
+    // 	String subCorpus = String.format("%s:%s", corpus, queryName);
+    // 	Charset charset = Charset.forName(strCharset);
+    // 	cqpQuery(corpus, queryName, query, charset);
+    // 	return new CqiDump(this, corpus, subCorpus, charset, subCorpusSize(subCorpus));
+    // }
 
     /**
      * Write a string on the socket.
@@ -476,6 +515,26 @@ public class CqiClient {
         }
     }
 
+    private synchronized int[] readIntArray() throws CqiClientException {
+	try {
+	    byte[] header = readHeaderFromServer();
+	    if (header != CQI_DATA_INT_LIST) {
+		throw new CqiClientException(UNEXPECTED_ANSWER);
+	    }
+	    int arrayLength = this.streamFromServer.readInt();
+	    int bsize = arrayLength * 4;
+	    int[] output = new int[arrayLength];
+	    byte[] abuffer = new byte[bsize];
+	    streamFromServer.readFully(abuffer, 0, bsize);
+	    for (int i = 0; i + 3 < bsize; i += 4) {
+		output[i >> 2] = bytesToInt(abuffer[i], abuffer[i+1], abuffer[i+2], abuffer[i+3]);
+	    }
+	    return output;
+	} catch (IOException e) {
+	    throw new CqiClientException("Error reading an int array", e);
+	}
+    }
+
     /**
      * Read an int array from the socket.
      *
@@ -495,7 +554,7 @@ public class CqiClient {
         }
         int bsize = arrayLength * 4;
         if (buffer.length < bsize) {
-            throw new CqiClientException(INSUFFICIENT_BUFFER_SIZE + " " + buffer.length + " " + arrayLength);
+            throw new CqiClientException(INSUFFICIENT_BUFFER_SIZE);
         }
         streamFromServer.readFully(buffer, 0, bsize);
         for (int i = 0; i + 3 < bsize; i += 4) {
@@ -719,8 +778,7 @@ public class CqiClient {
 	    this.streamToServer.write(function);
 	    this.writeString(string);
 	    this.writeIntArray(ints);
-	    int[] output = new int[ints.length];
-	    readIntList(output);
+	    int[] output = readIntArray();
 	    return output;
 	} catch (IOException e) {
 	    throw new CqiClientException(SERVER_IO_ERROR, e);
@@ -733,8 +791,7 @@ public class CqiClient {
 	    this.streamToServer.write(function);
 	    this.writeString(string);
 	    this.writeIntArray(fromPosition, toPosition);
-	    int[] output = new int[toPosition - fromPosition];
-	    readIntList(output);
+	    int[] output = readIntArray();
 	    return output;
 	} catch (IOException e) {
 	    throw new CqiClientException(SERVER_IO_ERROR, e);
@@ -825,8 +882,7 @@ public class CqiClient {
      */
     synchronized int[] cpos2Struc(String attribute, int[] cpos)
 	throws CqiClientException {
-        return genericStringXIntArraytoIntArray(attribute, cpos,
-                CQI_CL_CPOS2STRUC);
+        return genericStringXIntArraytoIntArray(attribute, cpos, CQI_CL_CPOS2STRUC);
     }
 
     synchronized int[] cpos2Struc(String attribute, int fromPosition, int toPosition)
@@ -898,8 +954,7 @@ public class CqiClient {
      */
     synchronized String[] struc2Str(String attribute, int[] strucs, Charset charset)
             throws CqiClientException {
-        return genericStringXIntArraytoStringArray(attribute, strucs,
-                CQI_CL_STRUC2STR, charset);
+        return genericStringXIntArraytoStringArray(attribute, strucs, CQI_CL_STRUC2STR, charset);
     }
 
     /**

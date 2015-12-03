@@ -65,25 +65,6 @@ public class CqiResult {
 
 
     /**
-     * Extracts positional attributes for a given range in the total match.
-     *
-     * @return array of arrays with the values corresponding to the range.
-     */
-    public int[][] cposRange(int start, int end) throws IllegalArgumentException, CqiClientException {
-	if (start < 0 || end >= resultSize || end < start) {
-	    throw new IllegalArgumentException("Range out of bounds");
-	}
-	int range = end - start + 1;
-	int[][] cposRangeArray = new int[5][range];
-	client.dumpSubCorpus(subCorpusName, CqiClient.CQI_CONST_FIELD_MATCH, start, end, cposRangeArray[MATCH_START]);
-	client.dumpSubCorpus(subCorpusName, CqiClient.CQI_CONST_FIELD_MATCHEND, start, end, cposRangeArray[MATCH_END]);
-	client.dumpSubCorpus(subCorpusName, CqiClient.CQI_CONST_FIELD_TARGET, start, end, cposRangeArray[TARGET]);
-	client.cpos2LBound(contextStructuralAttributeName, cposRangeArray[MATCH_START], cposRangeArray[CONTEXT_START], range);
-	client.cpos2RBound(contextStructuralAttributeName, cposRangeArray[MATCH_END], cposRangeArray[CONTEXT_END], range);
-	return cposRangeArray;
-    }
-
-    /**
      * Retrieves the current match index.
      *
      * @return the current match number; {@code -1} if there is no current match

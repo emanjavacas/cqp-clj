@@ -9,8 +9,8 @@
                [(keyword k) (if (= "port" k) (Integer/parseInt v) v)]))))
 
 (def default-spec
-  {:port 4877
-   :host "127.0.0.1"
+  {:host "127.0.0.1"
+   :port 4877   
    :user "user"
    :pass "pass"})
 

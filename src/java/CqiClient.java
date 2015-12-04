@@ -83,7 +83,7 @@ public class CqiClient {
     private static final String INVALID_FIELD_CQP_ERROR = "Invalid field";
     private static final String OUT_OF_RANGE_CQP_ERROR = "Out of range";
     private static final String SYNTAX_CQP_ERROR = "CQP Syntax error";
-    private static final String GENERAL_SQP_ERROR = "General CQP error";
+    private static final String GENERAL_CQP_ERROR = "General CQP error";
     private static final String CONNECTION_REFUSED_ERROR = "Connection refused";
     private static final String USER_ABORT_ERROR = "User abort";
     private static final String SYNTAX_ERROR = "Syntax error";
@@ -254,45 +254,56 @@ public class CqiClient {
      * @param strCharset string specifying the charset
      */
     public synchronized String[] dumpPositionalAttributes(String corpus, String attribute, int[] cpos,
-	Charset charset) throws CqiClientException {
-	return cpos2Str(String.format("%s.%s", corpus, attribute), cpos, charset);
+	Charset charset)  {
+	try {
+	    return cpos2Str(String.format("%s.%s", corpus, attribute), cpos, charset);
+	} catch (CqiClientException e) {
+	    return null;
+	}
     }
 
-    public synchronized String[] dumpPositionalAttributes(String corpus, String attribute, int[] cpos)
-	throws CqiClientException {
+    public synchronized String[] dumpPositionalAttributes(String corpus, String attribute, int[] cpos) {
 	Charset charset;
 	try {
 	    charset = Charset.forName(corpusCharset(corpus));
 	} catch (IOException e) {
-	    throw new CqiClientException(SERVER_IO_ERROR, e);
-	} 
+	    return null;
+	} catch (CqiClientException e) {
+	    return null;
+	}
 	return dumpPositionalAttributes(corpus, attribute, cpos, charset);
     }
 
     public synchronized String[] dumpPositionalAttributes(String corpus, String attribute, 
-             int fromPosition, int toPosition, Charset charset) throws CqiClientException {
-	return cpos2Str(String.format("%s.%s", corpus, attribute), fromPosition, toPosition, charset);
+             int fromPosition, int toPosition, Charset charset)  {
+	try {
+	    return cpos2Str(String.format("%s.%s", corpus, attribute), fromPosition, toPosition, charset);	    
+	} catch (CqiClientException e) {
+	    return null;
+	}
     }
 
     public synchronized String[] dumpPositionalAttributes(String corpus, String attribute, 
-             int fromPosition, int toPosition) throws CqiClientException {
+             int fromPosition, int toPosition) {
 	Charset charset;
 	try {
 	    charset = Charset.forName(corpusCharset(corpus));
 	} catch (IOException e) {
-	    throw new CqiClientException(SERVER_IO_ERROR, e);
+	    return null;
+	} catch (CqiException e) {
+	    return null;
 	}
 	return dumpPositionalAttributes(corpus, attribute, fromPosition, toPosition, charset);
     }
 
     public synchronized String[] dumpPositionalAttributes(String corpus, String attribute, 
-             int[] cpos, String strCharset) throws CqiClientException {
+             int[] cpos, String strCharset) {
 	Charset charset = Charset.forName(strCharset);
 	return dumpPositionalAttributes(corpus, attribute, cpos, charset);
     }
 
     public synchronized String[] dumpPositionalAttributes(String corpus, String attribute, 
-             int fromPosition, int toPosition, String strCharset) throws CqiClientException {
+             int fromPosition, int toPosition, String strCharset) {
 	Charset charset = Charset.forName(strCharset);
 	return dumpPositionalAttributes(corpus, attribute, fromPosition, toPosition, charset);
     }
@@ -409,7 +420,7 @@ public class CqiClient {
 	try {
 	    return subCorpusSize(String.format("%s:%s", corpus, subcorpus));
 	} catch (CqiClientException e) {
-	    return -1;
+	    return null;
 	}
     }
 
@@ -428,7 +439,7 @@ public class CqiClient {
 	try {
 	    String[] subcorpora = listSubcorpora(corpus);
 	    if (!Arrays.asList(listSubcorpora(corpus)).contains(subCorpus)) {
-		return new int[3][0];
+		return null;
 	    } 	    
 	    String subCorpusName = String.format("%s:%s", corpus, subCorpus);
 	    int resultSize = subCorpusSize(subCorpusName);
@@ -761,7 +772,7 @@ public class CqiClient {
                 b = this.streamFromServer.readByte();
                 switch (b) {
                     case 0x01:// cf cqi.h:39
-                        throw new CqiClientException(GENERAL_SQP_ERROR);
+                        throw new CqiClientException(GENERAL_CQP_ERROR);
                     case 0x02:// cf cqi.h:40
                         throw new CqiClientException(NO_SUCH_CORPUS_CQP_ERROR);
                     case 0x03:// cf cqi.h:41

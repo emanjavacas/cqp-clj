@@ -142,6 +142,8 @@ or structural attributes encoded in a corpus as follows:
 #+BEGIN_SRC clojure
 (with-cqi-client [client (make-cqi-client (read-init "cqpserver.init"))]
   (.corpusPositionalAttributes (:client client) "DICKENS"))
+
+;=> ["word" "pos" "lemma" "nbc"]
 #+END_SRC
 
 Collaboration will be gratefully welcomed :-)

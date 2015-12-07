@@ -1,6 +1,6 @@
 (ns cqp-clj.core
   (:import [CqiClient] [CqiClientException])
-  (:require [cqp-clj.spec :refer [cqp-spec]]
+  (:require [cqp-clj.spec :refer [read-init]]
             [cqp-clj.paginator :refer [paginator]]))
 
 (set! *warn-on-reflection* true)
@@ -46,9 +46,12 @@
   "Extract corpus positions for current query.
   Returns a vector with three vectors corresponding
   to match-start match-end & target for each match."
-  [cqi-client corpus from to]   
-  (let [{client :client} cqi-client]
-    (map vec (.dumpSubCorpus ^CqiClient client corpus from to))))
+  ([cqi-client corpus from]
+   (let [to (query-size cqi-client corpus)]
+     (cpos-range cqi-client corpus from to)))
+  ([cqi-client corpus from to]   
+   (let [{client :client} cqi-client]
+     (map vec (.dumpSubCorpus ^CqiClient client corpus from to)))))
 
 (defn target->idx 
   "Extract target position in a range"
@@ -65,7 +68,7 @@
 ;;; check java source
 (defn span->struc
   ([cqi-client corpus name from to]
-   (span->attr cqi-client corpus name from to "utf8"))
+   (span->struc cqi-client corpus name from to "utf8"))
   ([cqi-client ^String corpus ^String name ^Integer from ^Integer to ^String charset]
    (let [{client :client} cqi-client]
      (vec (.dumpStructuralAttributes ^CqiClient client corpus name from to charset)))))
@@ -113,7 +116,7 @@
 
 (defn cpos-seq-handler 
   ([cqi-client corpus cpos context attrs]
-   (cpos-seq-handler cqi-client corpus cpos context charset attrs))
+   (cpos-seq-handler cqi-client corpus cpos context "utf8" attrs))
   ([cqi-client corpus cpos context charset attrs]
    (map #(cpos-token-handler cqi-client corpus % context charset attrs)
         (apply map vector cpos))))
@@ -128,13 +131,11 @@
          (throw (ex-info (:message (bean e#)) {})))
        (finally (disconnect! ~(client-bindings 0))))))
 
-(def pos-attr {:attr-type :pos :attr-name "word"}) 
-(def word-attr {:attr-type :pos :attr-name "pos"})
+(def pos-attr {:attr-type :pos :attr-name "pos"}) 
+(def word-attr {:attr-type :pos :attr-name "word"})
 (def lemma-attr {:attr-type :pos :attr-name "lemma"})
+(def head-attr {:attr-type :struc :attr-name "np_h"})
 
-;;; sample run
-;; (def output
-;;   (with-cqi-client [cqi-client (make-cqi-client cqp-spec)]
-;;     (query! cqi-client "NL" "@[word='dick']")
-;;     (let [cpos (cpos-range cqi-client "NL" 10 20)]
-;;       (cpos-seq-handler cqi-client "NL" cpos 2 [pos-attr word-attr]))))
+
+
+

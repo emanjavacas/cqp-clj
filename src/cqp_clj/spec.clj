@@ -2,16 +2,19 @@
   (:require [clojure.java.io :refer [reader]]
             [clojure.string :as str]))
 
-(defn spec-from-file [fname]
-  (let [lines (line-seq (reader fname))]
-    (into {} (for [line lines
-                   :let [[k v] (str/split line #"\t")]]
-               [(keyword k) (if (= "port" k) (Integer/parseInt v) v)]))))
-
 (def default-spec
   {:host "127.0.0.1"
-   :port 4877   
-   :user "user"
-   :pass "pass"})
+   :port 4877})
 
-(def cqp-spec (spec-from-file "cqp-clj.init"))
+(defn uncomment [line]
+  (first (str/split line #";")))
+
+(defn read-init [fname]
+  (let [lines (line-seq (reader fname))]
+    (reduce merge default-spec 
+            (for [line lines
+                  :let [tokens (str/split (uncomment line) #" ")]]            
+              (if (= 2 (count tokens))
+                {(keyword (first tokens)) (second tokens)}
+                {:user (second tokens)
+                 :pass (str/replace (last tokens) #"\W+" "")})))))

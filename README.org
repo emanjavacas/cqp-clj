@@ -1,0 +1,157 @@
+* CQP-CLJ
+
+A clojure library that provides client access to a running [[http://cwb.sourceforge.net/cqi.php][cqpserver]] process.
+It relies on a Java implementation of the CQi client specification originally
+writen and licensed at the University of Tübingen (Seminar für Sprachwissenschaft)
+and further modified and expanded by me.
+
+** Usage
+*** Running the cqpserver process
+
+ Provided a cqp installation and an indexed version of BNC, first run a cqpserver
+ process. In order to do this and to interact with cqpserver you need to assign 
+ credentials to the meant end user. This can be done through a config file
+ commonly named  ~cqpserver.init~:
+
+ #+BEGIN_EXAMPLE
+host 127.0.0.1;
+user foo "bar";
+ #+END_EXAMPLE
+
+ then, this init file can be passed to the cqpserver process with the -I flag:
+
+ #+BEGIN_EXAMPLE
+cqpserver -I cqpserver.init
+ #+END_EXAMPLE
+
+A port can also be specifed, otherwise cqpserver will listen to port 4877.
+
+*** Clojure client
+
+Now from the clojure repl we first connect to the server with the given specification.
+
+#+BEGIN_SRC clojure
+(require 'cqp-clj.spec :refer [read-init])
+(require 'cqp-clj.core :as cqp)
+
+(def cqp-spec (read-init "/path/to/cqpserver.init"))
+(def client (cqp/make-cqi-client cqp-spec))
+#+END_SRC
+
+~client~ is a very thin record that will be passed as first argument of the other functions.
+
+#+BEGIN_SRC clojure
+(cqp/query client "DICKENS" "'living' [pos='NN.*']" "latin1")
+(cqp/query-size client "DICKENS") ; 289
+#+END_SRC
+
+First we query from the DICKENS corpus, passing the query and the character set.
+Then, we retrieve the number of hits. The results of the query are stored in a
+subcorpus with name "Result", therefore we need to speify the name of the corpus
+that was last queried.
+
+In order to retrieve positional and structural attributes we first define those
+attributes we are interested in. In this case we have three positional attributes
+and one structural attribute:
+
+#+BEGIN_SRC clojure
+(def pos-attr {:attr-type :pos :attr-name "pos"}) 
+(def word-attr {:attr-type :pos :attr-name "word"})
+(def lemma-attr {:attr-type :pos :attr-name "lemma"})
+(def np-head-attr {:attr-type :struc :attr-name "np_h"})
+(def chapter-title-attr {:attr-type :struc :attr-name "np_h"})
+#+END_SRC
+
+#+BEGIN_SRC clojure
+(def cpos (cpos-range client 0 10))
+(def result 
+  (cpos-seq-handler 
+    client "DICKENS" cpos 2 
+    [pos-attr word-attr lemma-attr np-head-attr chapter-title-attr]))
+#+END_SRC
+
+~cpos-range~ gives us the corpus positions for the matches in a range defined
+by a start index and an end index. In the example above, we retrieve the first
+ten matches of the previous query.
+For each item a sequence of match corpus positions and a context of two words around the match,
+we extract the specified attributes.
+
+#+BEGIN_SRC clojure
+(take 3 result) 
+
+;=>
+[({:np_h "", :pos "VBN", :lemma "hang", :word "hung", :id 16099}
+  {:np_h "", :pos "IN", :lemma "with", :word "with", :id 16100}
+  {:np_h "green", :pos "VBG", :lemma "live", :word "living", :id 16101, :target true, :match true}
+  {:np_h "green", :pos "NN", :lemma "green", :word "green", :id 16102}
+  {:np_h "green", :pos ",", :lemma ",", :word ",", :id 16103})
+ ({:np_h "idea", :pos "NN", :lemma "idea", :word "idea", :id 49731}
+  {:np_h "idea", :pos "IN", :lemma "of", :word "of", :id 49732}
+  {:np_h "idea", :pos "VBG", :lemma "live", :word "living", :id 49733, :target true, :match true}
+  {:np_h "idea", :pos "IN", :lemma "in", :word "in", :id 49734}
+  {:np_h "idea", :pos "PP", :lemma "it", :word "it", :id 49735})
+ ({:np_h "", :pos "DT", :lemma "a", :word "a", :id 122588}
+  {:np_h "", :pos "NN", :lemma "lady", :word "lady", :id 122589}
+  {:np_h "", :pos "VBG", :lemma "live", :word "living", :id 122590, :target true, :match true}
+  {:np_h "", :pos "IN", :lemma "at", :word "at", :id 122591}
+  {:np_h "", :pos "DT", :lemma "a", :word "a", :id 122592})
+    ... ]
+#+END_SRC
+
+The attributes :id, :target and :match are always given and refer to the absolute corpus
+position, whether the token is target or not (specified in CQP query syntax by a ~@~ at 
+the front), and whether the token belongs to the match (otherwise it belongs to the context).
+
+After we are finished, we should disconnect from the server (otherwise our child process will
+not be stopped as long as the server process is running.
+
+#+BEGIN_SRC clojure
+(disconnect! client) ; true
+#+END_SRC
+
+For cases in which we only operate in place on the query and we can drop
+the query right after doing some work on it, there is a macro that automatically
+closes the connection after.
+
+For instance, here we compute the distribution of POS tags for match tokens.
+
+#+BEGIN_SRC clojure
+(def result
+  (with-cqi-client [cqi-client (make-cqi-client (read-init "cqpserver.init"))]
+    (query! cqi-client "DICKENS" "@[word='living']")
+      (cpos-seq-handler 
+         cqi-client             ; client
+	 "DICKENS"              ; corpus
+	 (cpos-range cqi-client "DICKENS" 0) ; corpus positions
+	 0                      ; context length
+         [pos-attr])))          ; attributes
+
+(frequencies (map :pos (filter :match (flatten result)))) ; {"VBG" 143, "NN" 146}
+#+END_SRC
+
+** Disclaimer
+
+This is product of one application where I had to interact with CQP from Clojure
+and therefore it only implements the functionality that was needed.
+
+For instance, alignment is not covered at all.
+Other functions specified in the [[http://cwb.sourceforge.net/files/cqi_tutorial.pdf][CQI-specification]] are implemented in Java but have
+not yet been wrapped in Clojure. For example, one can list the positional attributes
+or structural attributes encoded in a corpus as follows:
+
+#+BEGIN_SRC clojure
+(with-cqi-client [client (make-cqi-client (read-init "cqpserver.init"))]
+  (.corpusPositionalAttributes (:client client) "DICKENS"))
+#+END_SRC
+
+Collaboration will be gratefully welcomed :-)
+
+** License
+
+#+begin_html
+<a href="http://opensource.org/licenses/GPL-3.0">
+  <img src="http://img.shields.io/:license-gpl-blue.svg" alt=":license-gpl-blue.svg" />
+</a>
+#+end_html
+
+Copyright © 2015 Enrique Manjavacas

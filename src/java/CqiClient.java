@@ -346,6 +346,18 @@ public class CqiClient {
 	return struc2Str(attributeName, strucs, charset);
     }
 
+    public synchronized String[] dumpStructuralAttributes(String corpus, String attribute, 
+	   int fromPosition, int toPosition,  String strCharset) throws CqiClientException {
+	Charset charset = Charset.forName(strCharset);
+	return dumpStructuralAttributes(corpus, attribute, fromPosition, toPosition, charset);
+    }
+
+    public synchronized String[] dumpStructuralAttributes(String corpus, String attribute,
+	 int[] cpos, String strCharset) throws CqiClientException {
+	Charset charset = Charset.forName(strCharset);
+	return dumpStructuralAttributes(corpus, attribute, cpos, charset);
+    }
+
     /**
      * Runs a default CQP query (storing results to result)
      * @param corpus the corpus name

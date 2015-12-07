@@ -290,7 +290,7 @@ public class CqiClient {
 	    charset = Charset.forName(corpusCharset(corpus));
 	} catch (IOException e) {
 	    return null;
-	} catch (CqiException e) {
+	} catch (CqiClientException e) {
 	    return null;
 	}
 	return dumpPositionalAttributes(corpus, attribute, fromPosition, toPosition, charset);
@@ -420,7 +420,7 @@ public class CqiClient {
 	try {
 	    return subCorpusSize(String.format("%s:%s", corpus, subcorpus));
 	} catch (CqiClientException e) {
-	    return null;
+	    return -1;
 	}
     }
 

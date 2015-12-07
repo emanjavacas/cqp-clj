@@ -253,57 +253,46 @@ public class CqiClient {
      * @param charset charset object specifying the charset
      * @param strCharset string specifying the charset
      */
-    public synchronized String[] dumpPositionalAttributes(String corpus, String attribute, int[] cpos,
-	Charset charset)  {
-	try {
-	    return cpos2Str(String.format("%s.%s", corpus, attribute), cpos, charset);
-	} catch (CqiClientException e) {
-	    return null;
-	}
+    public synchronized String[] dumpPositionalAttributes(String corpus, String attribute, 
+	int[] cpos, Charset charset) throws CqiClientException {
+	return cpos2Str(String.format("%s.%s", corpus, attribute), cpos, charset);
     }
 
-    public synchronized String[] dumpPositionalAttributes(String corpus, String attribute, int[] cpos) {
+    public synchronized String[] dumpPositionalAttributes(String corpus, String attribute, 
+        int[] cpos)  throws CqiClientException {
 	Charset charset;
 	try {
 	    charset = Charset.forName(corpusCharset(corpus));
 	} catch (IOException e) {
-	    return null;
-	} catch (CqiClientException e) {
-	    return null;
+	    throw new CqiClientException(SERVER_IO_ERROR, e);
 	}
 	return dumpPositionalAttributes(corpus, attribute, cpos, charset);
     }
 
     public synchronized String[] dumpPositionalAttributes(String corpus, String attribute, 
-             int fromPosition, int toPosition, Charset charset)  {
-	try {
-	    return cpos2Str(String.format("%s.%s", corpus, attribute), fromPosition, toPosition, charset);	    
-	} catch (CqiClientException e) {
-	    return null;
-	}
+             int fromPosition, int toPosition, Charset charset) throws CqiClientException {
+	return cpos2Str(String.format("%s.%s", corpus, attribute), fromPosition, toPosition, charset); 
     }
 
     public synchronized String[] dumpPositionalAttributes(String corpus, String attribute, 
-             int fromPosition, int toPosition) {
+             int fromPosition, int toPosition) throws CqiClientException {
 	Charset charset;
 	try {
 	    charset = Charset.forName(corpusCharset(corpus));
 	} catch (IOException e) {
-	    return null;
-	} catch (CqiClientException e) {
-	    return null;
-	}
+	    throw new CqiClientException(SERVER_IO_ERROR, e);
+	} 
 	return dumpPositionalAttributes(corpus, attribute, fromPosition, toPosition, charset);
     }
 
     public synchronized String[] dumpPositionalAttributes(String corpus, String attribute, 
-             int[] cpos, String strCharset) {
+             int[] cpos, String strCharset)  throws CqiClientException {
 	Charset charset = Charset.forName(strCharset);
 	return dumpPositionalAttributes(corpus, attribute, cpos, charset);
     }
 
     public synchronized String[] dumpPositionalAttributes(String corpus, String attribute, 
-             int fromPosition, int toPosition, String strCharset) {
+             int fromPosition, int toPosition, String strCharset) throws CqiClientException {
 	Charset charset = Charset.forName(strCharset);
 	return dumpPositionalAttributes(corpus, attribute, fromPosition, toPosition, charset);
     }
@@ -324,7 +313,8 @@ public class CqiClient {
 	return struc2Str(attributeName, strucs, charset);
     }
 
-    public synchronized String[] dumpStructuralAttributes(String corpus, String attribute, int[] cpos) throws CqiClientException {
+    public synchronized String[] dumpStructuralAttributes(String corpus, String attribute, int[] cpos) 
+	throws CqiClientException {
 	Charset charset;
 	try {
 	    charset = Charset.forName(corpusCharset(corpus));
@@ -362,36 +352,24 @@ public class CqiClient {
      * @param query the query
      */ 
 
-    public synchronized boolean query(String corpus, String query) {
-	try {
-	    cqpQuery(corpus, DEFAULT_SUBCORPUS_NAME, query, DEFAULT_CHARSET);
-	    return true;
-	} catch (CqiClientException e) {
-	    return false;
-	}
+    public synchronized void query(String corpus, String query) throws CqiClientException {
+	cqpQuery(corpus, DEFAULT_SUBCORPUS_NAME, query, DEFAULT_CHARSET);
     }
 
-    public synchronized boolean query(String corpus, String query, String charset) {
+    public synchronized void query(String corpus, String query, String charset) 
+	throws CqiClientException {
 	Charset charsetCharset = Charset.forName(charset);
-	return query(corpus, query, charsetCharset);
+	query(corpus, query, charsetCharset);
     }
 
-    public synchronized boolean query(String corpus, String query, Charset charset) {
-	try {
+    public synchronized void query(String corpus, String query, Charset charset) 
+	throws CqiClientException {
 	    cqpQuery(corpus, DEFAULT_SUBCORPUS_NAME, query, charset);
-	    return true;
-	} catch (CqiClientException e) {
-	    return false;
-	}
     }
 
-    public synchronized boolean query(String corpus, String subcorpus, String query, Charset charset) {
-	try {
-	    cqpQuery(corpus, subcorpus, query, charset);
-	    return true;
-	} catch (CqiClientException e) {
-	    return false;
-	}
+    public synchronized void query(String corpus, String subcorpus, String query, Charset charset)
+	throws CqiClientException {
+	cqpQuery(corpus, subcorpus, query, charset);
     }
     /**
      * drops query, defaulting to default subcorpus name
@@ -399,17 +377,13 @@ public class CqiClient {
      * @param corpus corpus name
      * @param subcorpus
      */
-    public synchronized boolean dropQuery(String corpus, String subCorpus){
-	try {
-	    dropSubCorpus(String.format("%s:%s", corpus, subCorpus));
-	} catch (CqiClientException e) {
-	    return false;
-	}
-	return true;
+    public synchronized void dropQuery(String corpus, String subCorpus) 
+    throws CqiClientException {
+	dropSubCorpus(String.format("%s:%s", corpus, subCorpus));
     }
 
-    public synchronized boolean dropQuery(String corpus){
-	return dropQuery(corpus, DEFAULT_SUBCORPUS_NAME);
+    public synchronized void dropQuery(String corpus) throws CqiClientException {
+	dropQuery(corpus, DEFAULT_SUBCORPUS_NAME);
     }
     /**
      * returns query size with appropriate defaults
